@@ -240,39 +240,3 @@ The system uses a multi-agent architecture orchestrated through a state machine:
 4. **Context Retrieval**: Query vector database for relevant context
 5. **Response Generation**: Format and deliver response
 6. **Output Delivery**: Voice, text, or visualization
-
-## Troubleshooting
-
-### Backend won't start
-- Check Python version: `python --version`
-- Ensure virtual environment is activated
-- Install dependencies: `pip install -r requirements.txt`
-
-### Frontend won't connect to backend
-- Verify backend is running on `http://localhost:8000`
-- Check CORS configuration in backend
-- Clear browser cache and restart dev server
-
-### Voice features not working
-- Verify API keys are configured
-- Check microphone permissions in browser
-- Test with browser console for errors
-
-## Contributing
-
-1. Create a feature branch: `git checkout -b feature/your-feature`
-2. Make your changes
-3. Write tests for new functionality
-4. Submit a pull request
-
-## License
-
-MIT License - See LICENSE file for details
-
-## Support
-
-For issues, questions, or suggestions, please open an issue on the repository.
-
----
-
-**Built with ❤️ for intelligent business intelligence**
