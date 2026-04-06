@@ -52,14 +52,14 @@ def get_google_user(access_token: str) -> dict:
         return json.loads(resp.read())
 
 
-def create_session_token(user: dict) -> str:
-    """Create a JWT session token for the user."""
+def create_session_token(user: dict, session_id: str = None) -> str:
     payload = {
-        "sub":     user["email"],
-        "email":   user["email"],
-        "name":    user.get("name", ""),
-        "picture": user.get("picture", ""),
-        "exp":     datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS),
+        "sub":        user["email"],
+        "email":      user["email"],
+        "name":       user.get("name", ""),
+        "picture":    user.get("picture", ""),
+        "session_id": session_id,   # added — used for logout
+        "exp":        datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM)
 

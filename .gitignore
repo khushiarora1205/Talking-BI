@@ -1,4 +1,12 @@
-# Python
+# === Environment Variables ===
+.env
+.env.local
+.env.*.local
+.env.production.local
+.secrets/
+secrets.json
+
+# === Python ===
 __pycache__/
 *.py[cod]
 *$py.class
@@ -23,31 +31,35 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# === Virtual Environments ===
 .venv
 venv/
 ENV/
 env/
-.env
-.env.local
-.env.*.local
+venv.bak/
+env.bak/
 
-# Node/npm
+# === Node/npm ===
 node_modules/
-npm-debug.log
-yarn-error.log
-dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 .pnp
 .pnp.js
 
-# Database
+# === Database & Vector Store ===
 *.sqlite3
+*.sqlite
 *.db
 chroma_db/
 
-# IDE
+# === IDE & Editors ===
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
 *.swp
 *.swo
 *~
@@ -55,30 +67,29 @@ chroma_db/
 .project
 .pydevproject
 .settings/
-*.sublime-project
-*.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# OS
+# === OS ===
 .DS_Store
 Thumbs.db
 *.log
 
-# Testing
+# === Testing ===
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
+.hypothesis/
 
-# Temporary files
+# === Temporary Files ===
 *.tmp
+*.bak
 tmp/
 temp/
-*.bak
 
-# API keys and secrets
-.secrets/
-secrets.json
-
-# Cache directories
+# === Cache ===
 .cache/
-.pytest_cache/

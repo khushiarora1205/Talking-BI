@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, RedirectResponse
 import io
 import config
+import tempfile, os, io
 
 app = FastAPI(title="Talking BI")
 
@@ -43,17 +44,29 @@ async def auth_google():
 
 @app.get("/auth/callback")
 async def auth_callback(code: str = None, error: str = None):
-    """Google redirects here after user consents."""
     if error or not code:
         return RedirectResponse(
             url=f"{config.FRONTEND_URL}?auth_error={error or 'cancelled'}"
         )
     try:
         from auth import exchange_code_for_token, get_google_user, create_session_token
-        token_data  = exchange_code_for_token(code)
-        user        = get_google_user(token_data["access_token"])
-        session_jwt = create_session_token(user)
-        # Redirect back to frontend with token in URL fragment
+        token_data = exchange_code_for_token(code)
+        user       = get_google_user(token_data["access_token"])
+
+        # ── Session tracking (non-fatal) ──────────────────────────
+        session_id = None
+        try:
+            from services.session_tracker import track_login
+            tracking   = await track_login(
+                name  = user.get("name", ""),
+                email = user.get("email", ""),
+            )
+            session_id = tracking.get("session_id")   # top-level key
+        except Exception as te:
+            print(f"Session tracking warning (non-fatal): {te}")
+        # ─────────────────────────────────────────────────────────
+
+        session_jwt = create_session_token(user, session_id=session_id)
         return RedirectResponse(
             url=f"{config.FRONTEND_URL}/auth?token={session_jwt}"
         )
@@ -75,11 +88,17 @@ async def auth_me(authorization: str = Header(default=None)):
 
 
 @app.post("/auth/logout")
-async def auth_logout():
-    """Logout is handled client-side by deleting the token."""
+async def auth_logout(authorization: str = Header(default=None)):
+    """Logout and deactivate session."""
+    try:
+        user = _get_current_user(authorization)
+        session_id = user.get("session_id")
+        if session_id:
+            from services.session_tracker import logout_session
+            await logout_session(session_id)
+    except Exception as e:
+        print(f"Logout tracking: {e}")
     return {"success": True}
-
-
 # ── HEALTH ────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -92,6 +111,56 @@ async def health():
 
 
 # ── DB CONNECT ────────────────────────────────────────────────────
+
+# @app.post("/connect")
+# async def connect_db(
+#     payload: dict,
+#     authorization: str = Header(default=None)
+# ):
+#     _get_current_user(authorization)   # must be logged in
+
+#     global _schema_cache, _db_ready
+
+#     db_url = payload.get("database_url", "").strip()
+#     if not db_url:
+#         return {"success": False, "error": "No database URL provided"}
+
+#     if not db_url.startswith(("postgresql://", "postgres://")):
+#         return {"success": False,
+#                 "error": "URL must start with postgresql:// or postgres://"}
+
+#     config.DATABASE_URL = db_url
+
+#     from db.supabase import reset_pool
+#     await reset_pool()
+
+#     from rag.chroma import reset_all_collections
+#     reset_all_collections()
+
+#     try:
+#         from agents.schema_agent import explore_schema
+#         _schema_cache = await explore_schema(sample_values=True)
+#         _db_ready = True
+#         tables = [t for t in _schema_cache if not _schema_cache[t]["is_view"]]
+#         views  = [t for t in _schema_cache if _schema_cache[t]["is_view"]]
+#         return {"success": True, "tables": tables,
+#                 "views": views, "total": len(_schema_cache)}
+#     except Exception as e:
+#         _schema_cache = {}
+#         _db_ready = False
+#         err = str(e)
+#         if "nodename nor servname" in err or "Name or service" in err:
+#             hint = ("Cannot reach host. Connection string may be incomplete. "
+#                     "Go to Supabase → Settings → Database → URI and copy the full string.")
+#         elif "password authentication" in err:
+#             hint = "Wrong password. Check the password in your connection string."
+#         elif "SSL" in err or "ssl" in err:
+#             hint = "SSL error. Ensure your URL ends with ?sslmode=require"
+#         elif "timeout" in err.lower():
+#             hint = "Connection timed out. Check your network."
+#         else:
+#             hint = err
+#         return {"success": False, "error": hint}
 
 @app.post("/connect")
 async def connect_db(
@@ -111,9 +180,11 @@ async def connect_db(
                 "error": "URL must start with postgresql:// or postgres://"}
 
     config.DATABASE_URL = db_url
+    print(f"🔗 Attempting to connect to: {db_url[:50]}...")
 
-    from db.supabase import reset_pool
+    from db.supabase import reset_pool, init_pool  # ADD init_pool import
     await reset_pool()
+    await init_pool(db_url)  # ADD THIS LINE - Initialize with new URL
 
     from rag.chroma import reset_all_collections
     reset_all_collections()
@@ -124,12 +195,16 @@ async def connect_db(
         _db_ready = True
         tables = [t for t in _schema_cache if not _schema_cache[t]["is_view"]]
         views  = [t for t in _schema_cache if _schema_cache[t]["is_view"]]
+        print(f"✅ Connected! Found {len(tables)} tables, {len(views)} views")
         return {"success": True, "tables": tables,
                 "views": views, "total": len(_schema_cache)}
     except Exception as e:
         _schema_cache = {}
         _db_ready = False
         err = str(e)
+        print(f"❌ CONNECTION ERROR: {err}")
+        print(f"📋 Full exception: {type(e).__name__}: {e}")
+        
         if "nodename nor servname" in err or "Name or service" in err:
             hint = ("Cannot reach host. Connection string may be incomplete. "
                     "Go to Supabase → Settings → Database → URI and copy the full string.")
@@ -142,29 +217,109 @@ async def connect_db(
         else:
             hint = err
         return {"success": False, "error": hint}
+@app.post("/upload-csv")
+async def upload_csv(
+    files: list[UploadFile] = File(...),
+    authorization: str = Header(default=None)
+):
+    """
+    Fallback: user uploads one or more CSV files.
+    Creates an in-memory SQLite DB, loads CSVs as tables, explores schema.
+    """
+    _get_current_user(authorization)
+    global _schema_cache, _db_ready
 
+    import pandas as pd
+    import sqlite3, re
+
+    # Create a temp SQLite file
+    tmp = tempfile.NamedTemporaryFile(suffix='.sqlite3', delete=False)
+    tmp.close()
+    sqlite_path = tmp.name
+
+    try:
+        conn = sqlite3.connect(sqlite_path)
+        table_names = []
+
+        for f in files:
+            raw = await f.read()
+            # Try common encodings
+            for enc in ('utf-8', 'utf-8-sig', 'latin-1', 'cp1252'):
+                try:
+                    df = pd.read_csv(io.BytesIO(raw), encoding=enc)
+                    break
+                except Exception:
+                    continue
+
+            # Sanitize table name from filename
+            tname = re.sub(r'[^a-zA-Z0-9_]', '_', f.filename.replace('.csv', ''))
+            tname = re.sub(r'_+', '_', tname).strip('_').lower() or 'uploaded_data'
+
+            df.to_sql(tname, conn, if_exists='replace', index=False)
+            table_names.append(tname)
+
+        conn.close()
+
+        # Point the universal driver at this SQLite file
+        from db.universal import init_pool, reset_pool
+        from rag.chroma import reset_all_collections
+
+        await reset_pool()
+        reset_all_collections()
+        config.DATABASE_URL = f"sqlite:///{sqlite_path}"
+        await init_pool(config.DATABASE_URL)
+
+        from agents.schema_agent import explore_schema
+        _schema_cache = await explore_schema(sample_values=True)
+        _db_ready = True
+
+        tables = list(_schema_cache.keys())
+        return {
+            'success': True,
+            'tables': tables,
+            'source': 'csv',
+            'message': f"Loaded {len(files)} CSV file(s) as tables: {', '.join(table_names)}"
+        }
+
+    except Exception as e:
+        _db_ready = False
+        return {'success': False, 'error': str(e)}
 
 # ── STARTUP ───────────────────────────────────────────────────────
 
 @app.on_event("startup")
 async def startup():
     global _schema_cache, _db_ready
+
+    # ── Verify auth DB connection at startup ──────────────────────
+    if config.AUTH_DB_URL:
+        try:
+            from db.auth_db import get_auth_pool
+            await get_auth_pool()   # This triggers pool creation + prints success message
+        except Exception as e:
+            print(f'⚠️  Auth DB connection failed at startup: {e}')
+            print('   Session tracking will not work until AUTH_DB_URL is fixed in .env')
+    else:
+        print('⚠️  AUTH_DB_URL not set — session tracking disabled')
+
+    # ── Data DB startup (existing logic, unchanged) ───────────────
     if config.DATABASE_URL:
         try:
+            from db.universal import init_pool
             from rag.chroma import reset_all_collections
             reset_all_collections()
+            await init_pool(config.DATABASE_URL)
             from agents.schema_agent import explore_schema
             _schema_cache = await explore_schema(sample_values=True)
             _db_ready = True
-            print(f"Schema loaded: {list(_schema_cache.keys())}")
+            print(f'Schema loaded: {list(_schema_cache.keys())}')
         except Exception as e:
-            print(f"Startup DB warning: {e}")
+            print(f'Startup DB warning: {e}')
             _schema_cache = {}
             _db_ready = False
     else:
         _schema_cache = {}
         _db_ready = False
-
 
 # ── VOICE ─────────────────────────────────────────────────────────
 

@@ -150,15 +150,44 @@ function ChartCard({ spec, insights, onVoicePlay, chartType, colors, insightOver
   const commonTooltipFormatter = (val, name) => [formatTooltipNumber(val), name]
 
   const chart = (() => {
-    const margin = { top: 5, right: 10, left: 10, bottom: 40 }
+    // In ChartCard, replace the margin and axis definitions:
+    const margin = { top: 10, right: 16, left: 8, bottom: 55 }  // more bottom for angled labels
+    const xAxisProps = {
+      dataKey: xKey,
+      tick: axisStyle,
+      axisLine: false,
+      tickLine: false,
+      tickFormatter: xTickFormatter,
+      angle: -35,
+      textAnchor: "end",
+      interval: "preserveStartEnd",
+      label: {
+        value: spec.x_label || xKey || '',
+        position: 'insideBottom',
+        offset: -40,
+        style: { fontSize: 10, fill: '#6B7280', fontWeight: 500 }
+      }
+    }
+    const yAxisProps = {
+      tick: axisStyle,
+      axisLine: false,
+      tickLine: false,
+      tickFormatter: formatAxisNumber,
+      width: 62,
+      label: {
+        value: spec.y_label || yKey || '',
+        angle: -90,
+        position: 'insideLeft',
+        offset: 10,
+        style: { fontSize: 10, fill: '#6B7280', fontWeight: 500 }
+      }
+    }
     switch (chartType) {
       case 'line': return (
         <LineChart data={spec.data} margin={margin} onClick={(d, e) => d?.activePayload && handleClick(d.activePayload[0], e)}>
           <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-          <XAxis dataKey={xKey} tick={axisStyle} axisLine={false} tickLine={false}
-            tickFormatter={xTickFormatter} angle={-35} textAnchor="end" interval="preserveStartEnd" />
-          <YAxis tick={axisStyle} axisLine={false} tickLine={false}
-            tickFormatter={formatAxisNumber} width={55} />
+          <XAxis {...xAxisProps} />
+          <YAxis {...yAxisProps} />
           <Tooltip contentStyle={tooltipStyle} formatter={commonTooltipFormatter} />
           <Line type="monotone" dataKey={yKey} stroke={c[0]} strokeWidth={2.5}
             dot={spec.data.length <= 20 ? { r: 3, fill: c[0], cursor: 'pointer' } : false}
@@ -174,10 +203,8 @@ function ChartCard({ spec, insights, onVoicePlay, chartType, colors, insightOver
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-          <XAxis dataKey={xKey} tick={axisStyle} axisLine={false} tickLine={false}
-            tickFormatter={xTickFormatter} angle={-35} textAnchor="end" interval="preserveStartEnd" />
-          <YAxis tick={axisStyle} axisLine={false} tickLine={false}
-            tickFormatter={formatAxisNumber} width={55} />
+          <XAxis {...xAxisProps} />
+          <YAxis {...yAxisProps} />
           <Tooltip contentStyle={tooltipStyle} formatter={commonTooltipFormatter} />
           <Area type="monotone" dataKey={yKey} stroke={c[0]} strokeWidth={2.5}
             fill={`url(#ag-${c[0].replace('#', '')})`} />
@@ -213,16 +240,34 @@ function ChartCard({ spec, insights, onVoicePlay, chartType, colors, insightOver
           )}
         </PieChart>
       )
+      case 'horizontal_bar': return (
+        <BarChart data={spec.data} layout="vertical"
+          barSize={Math.max(6, Math.min(22, 160 / Math.max(spec.data.length, 1)))}
+          margin={{ top: 5, right: 20, left: 10, bottom: 10 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" horizontal={false} />
+          <XAxis type="number" tick={axisStyle} axisLine={false} tickLine={false}
+            tickFormatter={formatAxisNumber}
+            label={{ value: spec.y_label || yKey || '', position: 'insideBottom', offset: -10,
+                    style: { fontSize: 10, fill: '#6B7280' } }} />
+          <YAxis type="category" dataKey={xKey} tick={axisStyle} axisLine={false} tickLine={false}
+            width={100}
+            tickFormatter={v => String(v).length > 14 ? String(v).slice(0,13)+'…' : String(v)}
+            label={{ value: spec.x_label || xKey || '', angle: -90, position: 'insideLeft',
+                    style: { fontSize: 10, fill: '#6B7280' } }} />
+          <Tooltip contentStyle={tooltipStyle} formatter={commonTooltipFormatter} />
+          <Bar dataKey={yKey} radius={[0, 4, 4, 0]} cursor="pointer">
+            {spec.data.map((_, i) => <Cell key={i} fill={c[i % c.length]} />)}
+          </Bar>
+        </BarChart>
+      )
       default: return (  // bar
         <BarChart data={spec.data}
           barSize={Math.max(6, Math.min(28, 180 / Math.max(spec.data.length, 1)))}
           margin={margin}
           onClick={(d, e) => d?.activePayload && handleClick(d.activePayload[0], e)}>
           <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-          <XAxis dataKey={xKey} tick={axisStyle} axisLine={false} tickLine={false}
-            tickFormatter={xTickFormatter} angle={-35} textAnchor="end" interval="preserveStartEnd" />
-          <YAxis tick={axisStyle} axisLine={false} tickLine={false}
-            tickFormatter={formatAxisNumber} width={55} />
+          <XAxis {...xAxisProps} />
+          <YAxis {...yAxisProps} />
           <Tooltip contentStyle={tooltipStyle} formatter={commonTooltipFormatter} />
           <Bar dataKey={yKey} radius={[4, 4, 0, 0]} cursor="pointer">
             {spec.data.map((_, i) => <Cell key={i} fill={c[i % c.length]} />)}
@@ -310,7 +355,7 @@ function DashboardPanel({ entry, activeTheme, onVoicePlay, dashRef, insightOverl
         </div>
       </div>
 
-      {/* 2×2 Chart grid */}
+      {/* 2×2 Chart grid
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '280px 280px', gap: 14 }}>
         {CHART_VARIANTS.map((type, i) => (
           <ChartCard key={type} spec={spec} insights={entry.insights}
@@ -319,7 +364,37 @@ function DashboardPanel({ entry, activeTheme, onVoicePlay, dashRef, insightOverl
             insightOverlayEnabled={insightOverlayEnabled}
           />
         ))}
-      </div>
+      </div> */}
+      {/* Dynamic chart grid — types decided by viz_agent */}
+      {(() => {
+        const specList = Array.isArray(entry.specs?.[activeTheme])
+          ? entry.specs[activeTheme]
+          : entry.specs?.[activeTheme]
+            ? [entry.specs[activeTheme], entry.specs[activeTheme],
+              entry.specs[activeTheme], entry.specs[activeTheme]]
+            : []
+
+        return (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: '300px 300px',
+            gap: 14,
+          }}>
+            {specList.map((chartSpec, i) => (
+              <ChartCard
+                key={`${chartSpec.chart_type}-${i}`}
+                spec={chartSpec}
+                insights={entry.insights}
+                onVoicePlay={i === 0 ? onVoicePlay : null}
+                chartType={chartSpec.chart_type}
+                colors={theme.colors}
+                insightOverlayEnabled={insightOverlayEnabled}
+              />
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Insights — always visible */}
       {entry.insights?.length > 0 && (
@@ -438,11 +513,15 @@ function LoginPage() {
 
 // ── CONNECT MODAL ─────────────────────────────────────────────────
 function ConnectModal({ onConnect, user, onLogout }) {
-  const [url, setUrl] = useState('')
+  const [tab, setTab]         = useState('url')   // 'url' | 'csv'
+  const [url, setUrl]         = useState('')
+  const [files, setFiles]     = useState([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError]     = useState('')
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef(null)
 
-  const handle = async () => {
+  const handleConnect = async () => {
     if (!url.trim()) return
     setLoading(true); setError('')
     try {
@@ -453,59 +532,145 @@ function ConnectModal({ onConnect, user, onLogout }) {
     finally { setLoading(false) }
   }
 
+  const handleCSVUpload = async () => {
+    if (!files.length) return
+    setLoading(true); setError('')
+    try {
+      const { uploadCSV } = await import('./lib/api')
+      const r = await uploadCSV(files)
+      if (r.success) onConnect(r.tables)
+      else setError(r.error || 'CSV upload failed')
+    } catch (e) { setError(`Upload error: ${e.message}`) }
+    finally { setLoading(false) }
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragOver(false)
+    const dropped = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.csv'))
+    setFiles(prev => [...prev, ...dropped])
+  }
+
+  const sharedCardStyle = {
+    position: 'relative', width: '100%', maxWidth: 460, margin: '0 16px',
+    background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: '36px'
+  }
+
   return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #0F172A 100%)' }}>
+    <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#0F172A 0%,#1E1B4B 50%,#0F172A 100%)' }}>
       <div style={{ position: 'absolute', top: '20%', left: '20%', width: 400, height: 400, background: 'rgba(99,102,241,0.08)', borderRadius: '50%', filter: 'blur(60px)' }} />
       <div style={{ position: 'absolute', bottom: '20%', right: '20%', width: 300, height: 300, background: 'rgba(139,92,246,0.08)', borderRadius: '50%', filter: 'blur(60px)' }} />
 
-      <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 16px', background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: '36px' }}>
+      <div style={sharedCardStyle}>
         {/* User info + logout */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 44, height: 44, background: 'linear-gradient(135deg, #3B82F6, #6366F1)', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {user?.picture
-                ? <img src={user.picture} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <BarChart3 size={22} color="#fff" />}
+            <div style={{ width: 40, height: 40, background: 'linear-gradient(135deg,#3B82F6,#6366F1)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {user?.picture ? <img src={user.picture} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <BarChart3 size={20} color="#fff" />}
             </div>
             <div>
-              <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Talking BI</div>
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>{user?.email || 'Signed in'}</div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Talking BI</div>
+              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>{user?.email}</div>
             </div>
           </div>
-          <button onClick={onLogout}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 12px', color: 'rgba(255,255,255,0.5)', fontSize: 11, cursor: 'pointer' }}>
-            <LogOut size={11} /> Logout
+          <button onClick={onLogout} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 10px', color: 'rgba(255,255,255,0.5)', fontSize: 11, cursor: 'pointer' }}>
+            <LogOut size={10} /> Logout
           </button>
         </div>
 
-        <div style={{ marginBottom: 6, fontSize: 20, fontWeight: 600, color: '#fff' }}>Connect your database</div>
-        <div style={{ marginBottom: 24, fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Paste your Supabase PostgreSQL connection string</div>
+        <div style={{ marginBottom: 20, fontSize: 19, fontWeight: 700, color: '#fff' }}>Connect your data</div>
 
-        <div style={{ position: 'relative', marginBottom: 12 }}>
-          <Database size={13} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.25)' }} />
-          <input value={url} onChange={e => { setUrl(e.target.value); setError('') }}
-            onKeyDown={e => e.key === 'Enter' && handle()}
-            placeholder="postgresql://user:password@host:6543/postgres?sslmode=require"
-            style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '12px 14px 12px 38px', color: '#fff', fontSize: 11, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
-          />
+        {/* Tab switcher */}
+        <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 3, marginBottom: 20 }}>
+          {[['url', Database, 'Connection String'], ['csv', 'upload', 'Upload CSV']].map(([id, Icon, label]) => (
+            <button key={id} onClick={() => { setTab(id); setError('') }}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: tab === id ? 600 : 400, background: tab === id ? 'rgba(255,255,255,0.12)' : 'transparent', color: tab === id ? '#fff' : 'rgba(255,255,255,0.4)', transition: 'all 0.15s' }}>
+              {id === 'url' ? <Database size={12} /> : <span style={{ fontSize: 14 }}>↑</span>}
+              {label}
+            </button>
+          ))}
         </div>
 
-        {error && (
-          <div style={{ display: 'flex', gap: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
-            <AlertCircle size={13} color="#F87171" style={{ flexShrink: 0, marginTop: 1 }} />
-            <span style={{ color: '#FCA5A5', fontSize: 12 }}>{error}</span>
-          </div>
+        {/* URL tab */}
+        {tab === 'url' && (
+          <>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
+              Supports: PostgreSQL, Supabase, MySQL, SQLite
+            </div>
+            <div style={{ position: 'relative', marginBottom: 12 }}>
+              <Database size={12} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.25)' }} />
+              <input value={url} onChange={e => { setUrl(e.target.value); setError('') }}
+                onKeyDown={e => e.key === 'Enter' && handleConnect()}
+                placeholder="postgresql:// or mysql:// or sqlite:///path.db"
+                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '11px 13px 11px 36px', color: '#fff', fontSize: 11, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            {error && (
+              <div style={{ display: 'flex', gap: 7, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '9px 11px', marginBottom: 12 }}>
+                <AlertCircle size={12} color="#F87171" style={{ flexShrink: 0, marginTop: 1 }} />
+                <span style={{ color: '#FCA5A5', fontSize: 11 }}>{error}</span>
+              </div>
+            )}
+            <button onClick={handleConnect} disabled={!url.trim() || loading}
+              style={{ width: '100%', background: !url.trim() || loading ? 'rgba(99,102,241,0.4)' : 'linear-gradient(135deg,#3B82F6,#6366F1)', border: 'none', borderRadius: 12, padding: '12px', color: '#fff', fontWeight: 600, fontSize: 13, cursor: !url.trim() || loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              {loading ? <><RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> Connecting...</> : <><Database size={13} /> Connect</>}
+            </button>
+            <div style={{ marginTop: 14, fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>
+              Supabase → Settings → Database → URI tab
+            </div>
+          </>
         )}
 
-        <button onClick={handle} disabled={!url.trim() || loading}
-          style={{ width: '100%', background: !url.trim() || loading ? 'rgba(99,102,241,0.4)' : 'linear-gradient(135deg, #3B82F6, #6366F1)', border: 'none', borderRadius: 12, padding: '13px', color: '#fff', fontWeight: 600, fontSize: 14, cursor: !url.trim() || loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          {loading ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Connecting...</> : <><Database size={14} /> Connect database</>}
-        </button>
+        {/* CSV tab */}
+        {tab === 'csv' && (
+          <>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
+              Upload one or more CSV files — each becomes a queryable table
+            </div>
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              style={{ border: `2px dashed ${dragOver ? '#6366F1' : 'rgba(255,255,255,0.15)'}`, borderRadius: 14, padding: '28px 20px', textAlign: 'center', cursor: 'pointer', marginBottom: 14, background: dragOver ? 'rgba(99,102,241,0.08)' : 'transparent', transition: 'all 0.15s' }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>📂</div>
+              <div style={{ fontSize: 13, color: '#fff', fontWeight: 500, marginBottom: 4 }}>
+                Drop CSV files here
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>or click to browse</div>
+              <input ref={fileInputRef} type="file" accept=".csv" multiple
+                style={{ display: 'none' }}
+                onChange={e => setFiles(prev => [...prev, ...Array.from(e.target.files)])} />
+            </div>
 
-        <div style={{ marginTop: 20, fontSize: 11, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>
-          Supabase → Settings → Database → Connection string → URI
-        </div>
+            {files.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                {files.map((f, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '7px 11px', marginBottom: 5 }}>
+                    <span style={{ fontSize: 11, color: '#fff' }}>📄 {f.name}</span>
+                    <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
+                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {error && (
+              <div style={{ display: 'flex', gap: 7, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '9px 11px', marginBottom: 12 }}>
+                <AlertCircle size={12} color="#F87171" style={{ flexShrink: 0, marginTop: 1 }} />
+                <span style={{ color: '#FCA5A5', fontSize: 11 }}>{error}</span>
+              </div>
+            )}
+
+            <button onClick={handleCSVUpload} disabled={!files.length || loading}
+              style={{ width: '100%', background: !files.length || loading ? 'rgba(99,102,241,0.4)' : 'linear-gradient(135deg,#10B981,#059669)', border: 'none', borderRadius: 12, padding: '12px', color: '#fff', fontWeight: 600, fontSize: 13, cursor: !files.length || loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              {loading ? <><RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> Loading CSVs...</> : <>↑ Load {files.length} CSV file{files.length !== 1 ? 's' : ''}</>}
+            </button>
+          </>
+        )}
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }
@@ -528,6 +693,8 @@ export default function App() {
   const [isRecording, setIsRecording] = useState(false)
   const [insightOverlayEnabled, setInsightOverlayEnabled] = useState(false)
   const mediaRef = useRef(null)
+  const audioRef = useRef(null)
+  const [isPlaying, setIsPlaying] = useState(false)
   const chunksRef = useRef([])
   const bottomRef = useRef(null)
   const dashRef = useRef(null)
@@ -571,16 +738,38 @@ export default function App() {
   }, [messages])
 
   const handleSpeak = async (text) => {
-    try {
-      const blob = await speakText(text)
-      if (!blob) return
-      const url = URL.createObjectURL(blob)
-      const audio = new Audio(url)
-      audio.play()
-      audio.onended = () => URL.revokeObjectURL(url)
-    } catch (e) { console.error('TTS:', e) }
+  // If already playing, pause/resume toggle
+  if (audioRef.current && !audioRef.current.ended) {
+    if (audioRef.current.paused) {
+      audioRef.current.play()
+      setIsPlaying(true)
+    } else {
+      audioRef.current.pause()
+      setIsPlaying(false)
+    }
+    return
   }
+  try {
+    const blob = await speakText(text)
+    if (!blob) return
+    const url = URL.createObjectURL(blob)
+    const audio = new Audio(url)
+    audioRef.current = audio
+    setIsPlaying(true)
+    audio.play()
+    audio.onended = () => { URL.revokeObjectURL(url); setIsPlaying(false); audioRef.current = null }
+    audio.onerror = () => { setIsPlaying(false); audioRef.current = null }
+  } catch (e) { console.error('TTS:', e) }
+}
 
+const handleStopSpeech = () => {
+  if (audioRef.current) {
+    audioRef.current.pause()
+    audioRef.current.currentTime = 0
+    audioRef.current = null
+    setIsPlaying(false)
+  }
+}
   const handleSend = async (text) => {
     const question = (text || input).trim()
     if (!question || isLoading) return
@@ -845,11 +1034,48 @@ export default function App() {
             </button>
 
             {/* Voice toggle */}
-            <button onClick={toggleVoice}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, padding: '5px 11px', borderRadius: 20, border: `1px solid ${voiceEnabled ? '#BFDBFE' : '#F1F5F9'}`, background: voiceEnabled ? '#EFF6FF' : 'transparent', color: voiceEnabled ? '#1D4ED8' : '#9CA3AF', cursor: 'pointer', transition: 'all 0.12s' }}>
+            <button
+              onClick={toggleVoice}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                fontSize: 11,
+                padding: '5px 11px',
+                borderRadius: 20,
+                border: `1px solid ${voiceEnabled ? '#BFDBFE' : '#F1F5F9'}`,
+                background: voiceEnabled ? '#EFF6FF' : 'transparent',
+                color: voiceEnabled ? '#1D4ED8' : '#9CA3AF',
+                cursor: 'pointer',
+                transition: 'all 0.12s'
+              }}
+            >
               {voiceEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
               Voice
             </button>
+
+            {/* ✅ ADD THIS RIGHT AFTER (outside button) */}
+            {isPlaying && (
+              <button
+                onClick={handleStopSpeech}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 11,
+                  padding: '5px 11px',
+                  borderRadius: 20,
+                  border: '1px solid #FECACA',
+                  background: '#FEF2F2',
+                  color: '#B91C1C',
+                  cursor: 'pointer',
+                  animation: 'pulse 1s infinite'
+                }}
+              >
+                ⏹ Stop
+              </button>
+            )}
+           
 
             {activeEntry && (
               <>
@@ -881,6 +1107,7 @@ export default function App() {
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { overflow: hidden; }
+        @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.6 }}
         @keyframes bounce { 0%,100%{transform:translateY(0);opacity:.5} 50%{transform:translateY(-4px);opacity:1} }
         @keyframes spin { to { transform: rotate(360deg) } }
         ::-webkit-scrollbar { width: 4px; }
