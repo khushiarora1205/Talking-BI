@@ -34,64 +34,52 @@ An intelligent business intelligence platform that combines AI-powered agents wi
 
 ## Prerequisites
 
-- Python 3.9+
-- Node.js 16+
-- npm or yarn
-- Supabase account (optional, for production database)
+- **Python**: 3.9 or higher
+- **Node.js**: 16 or higher
+- **npm** or **yarn**
+- **Git** (for version control)
+- **Supabase account** (optional, for production database)
 
-## Installation
+## Quick Start
 
 ### Backend Setup
 
-1. Navigate to the backend directory:
+1. Navigate to the backend directory and create a virtual environment:
 ```bash
 cd backend
-```
-
-2. Create a virtual environment:
-```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies:
+2. Install Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Configure environment variables:
+3. Set up environment variables:
 ```bash
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your API keys and configuration
 ```
 
-5. Start the development server:
+4. Start the development server:
 ```bash
 uvicorn main:app --reload --port 8000
 ```
-
-The API will be available at `http://localhost:8000`
-- API docs: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
 
 ### Frontend Setup
 
 1. Navigate to the frontend directory:
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
 ```
 
-3. Start the development server:
+2. Start the development server:
 ```bash
 npm run dev
 ```
 
-The application will be available at `http://localhost:5173` (or the URL shown in your terminal)
 
 ## Project Structure
 
@@ -149,66 +137,28 @@ The backend provides RESTful API endpoints for:
 - **Insights**: Get automated insights and analytics
 - **Voice**: Handle speech-to-text and text-to-speech
 
-See API documentation at `http://localhost:8000/docs` for detailed endpoint information.
-
 ## Configuration
 
-Create a `.env` file in the backend directory with the following variables:
+### Environment Variables
 
-```
-# Supabase
+Create a `.env` file in the `backend/` directory with the following configuration:
+
+```env
+# ===== Supabase =====
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_key
 
-# LLM Configuration
-OPENAI_API_KEY=your_openai_key
+# ===== LLM Configuration =====
+OPENAI_API_KEY=your_openai_api_key
 LLM_MODEL=gpt-4
 
-# Voice
+# ===== Voice Services =====
 VOICE_API_KEY=your_voice_api_key
 
-# App Settings
+# ===== Application Settings =====
 DEBUG=True
 PORT=8000
-```
-
-## Development
-
-### Running Tests
-
-```bash
-# Backend tests
-cd backend
-pytest
-
-# Frontend tests
-cd frontend
-npm run test
-```
-
-### Code Quality
-
-```bash
-# Backend linting
-cd backend
-pylint agents/ db/ rag/ sql/ voice/
-
-# Frontend linting
-cd frontend
-npm run lint
-```
-
-### Building for Production
-
-```bash
-# Backend
-cd backend
-# Use gunicorn or similar for production
-
-# Frontend
-cd frontend
-npm run build
-# Output in dist/ directory
+LOG_LEVEL=INFO
 ```
 
 ## Usage Example
@@ -216,27 +166,46 @@ npm run build
 ### Starting a Conversation
 
 1. Open the web interface at `http://localhost:5173`
-2. Ask a question in natural language
+2. Enter a natural language question
 3. The system will:
-   - Process your query through the appropriate agents
+   - Route your query to the appropriate agent
    - Generate SQL queries if needed
    - Retrieve relevant context from the vector database
-   - Create visualizations
+   - Create visualizations if applicable
    - Provide voice responses (if enabled)
 
 ### Voice Interaction
 
-- Click the microphone icon to speak
+- Click the **microphone icon** in the UI to activate speech-to-text
+- Speak your question clearly
 - Wait for processing
-- Receive audio response
+- Receive an audio response with results
+
+### Example Queries
+
+- "Show me the top 10 customers by revenue"
+- "What are the sales trends for Q1?"
+- "Generate a pie chart of product categories"
+- "Compare last month's performance with this month"
 
 ## Architecture
 
-The system uses a multi-agent architecture orchestrated through a state machine:
+The system uses a **multi-agent architecture** orchestrated through a state machine for intelligent request routing:
 
-1. **Input Processing**: Voice or text input
-2. **Agent Selection**: Route to appropriate agent based on query
-3. **Execution**: Agent processes the request
-4. **Context Retrieval**: Query vector database for relevant context
-5. **Response Generation**: Format and deliver response
-6. **Output Delivery**: Voice, text, or visualization
+1. **Input Processing**: Accept voice or text input from the user
+2. **Query Analysis**: Understand intent and extract parameters
+3. **Agent Routing**: Select the appropriate agent(s) based on query type
+4. **Execution**: Agent processes the request (SQL generation, data retrieval, etc.)
+5. **Context Retrieval**: Query Chromadb vector database for relevant context
+6. **Response Generation**: Format results (text, visualization, or data)
+7. **Output Delivery**: Return response via voice, text, or interactive UI
+
+### Agent Responsibilities
+
+- **Data Agent**: Explores and retrieves data from various sources
+- **SQL Agent**: Generates and executes optimized SQL queries
+- **Schema Agent**: Manages database schema understanding and metadata
+- **RAG Agent**: Provides context-aware responses using retrieval-augmented generation
+- **Insight Agent**: Detects patterns and generates automated business insights
+- **Visualization Agent**: Creates dynamic charts and dashboard specifications
+- **Voice Agent**: Orchestrates voice interactions (STT/TTS)
